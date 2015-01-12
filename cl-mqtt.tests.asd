@@ -10,4 +10,6 @@
                :vtf
                :i4-diet-utils
                :cl-mqtt)
-  :components ((:file "cl-mqtt-test")))
+  :components ((:file "cl-mqtt-test")
+               (:file "interop-broker")
+               (:file "interop-test")))

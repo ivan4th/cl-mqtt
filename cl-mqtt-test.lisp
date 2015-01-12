@@ -6,11 +6,44 @@
 (defparameter *message-tests*
   '((:connect
      #(#x10 ;; Fixed header, message type=0x01 (CONNECT), DUP=0, QoS=0, Retain=0
+       #x1F ;; Remaining length=31
+       #x00 #x04 ;; Protocol Name -- len
+       #x4d #x51 #x54 #x54 ;; Protocol Name -- MQTT for MQTT 3.1.1
+       #x04 ;; Protocol level -- 4 for MQTT 3.1.1
+       #x02 ;; Flags:
+       ;; Username Flag: 0
+       ;; Password Flag: 0
+       ;; Will Retain Flag: 0
+       ;; Will QoS: 0 (2 bits)
+       ;; Will Flag: 0
+       ;; Clean Session Flag: 1
+       ;; (bit 0 is reserved)
+       #x00 #x3c ;; Keep Alive (secs): 60
+       #x00 #x13 ;; Client ID len = 19
+       #x6d #x6f #x73 #x71 #x73 #x75 #x62 #x2f ;; Client ID = mosqsub/10224-think
+       #x31 #x30 #x32 #x32 #x34 #x2d #x74 #x68
+       #x69 #x6e #x6b)
+     (:type :connect
+      :dup 0
+      :qos 0
+      :retain 0
+      :protocol-name "MQTT"
+      :protocol-level 4
+      :connect-username-flag 0
+      :connect-password-flag 0
+      :connect-will-qos 0
+      :connect-will-flag 0
+      :connect-clean-session-flag 1
+      :connect-keepalive 60
+      :client-id "mosqsub/10224-think"))
+    #++
+    (:connect
+     #(#x10 ;; Fixed header, message type=0x01 (CONNECT), DUP=0, QoS=0, Retain=0
        #x21 ;; Remaining length=33
        #x00 #x06 ;; Protocol Name -- len
        #x4d #x51 #x49 #x73 #x64 #x70 ;; Protocol Name -- string "MQIsdp" (should be MQTT in MQTT 3.1.1)
-       #x03 ;; Protocol level -- 3 (should be 4 in MQTT 3.1.1)
-       #x02 ;; Flags:
+       #x03      ;; Protocol level -- 3 (should be 4 in MQTT 3.1.1)
+       #x02      ;; Flags:
        ;; Username Flag: 0
        ;; Password Flag: 0
        ;; Will Retain Flag: 0
@@ -145,7 +178,13 @@
      #(#xd0 ;; Fixed header, message type=0x0d (PINGRESP)
        #x00 ;; Remaining length=0
        )
-     (:type :pingresp))))
+     (:type :pingresp))
+
+    (:disconnect
+     #(#xe0 ;; Fixed header, message type=0x0e (DISCONNECT)
+       #x00 ;; Remaining length=0
+       )
+     (:type :disconnect))))
 
 (defstruct (message-test (:type list))
   type packet message)

@@ -111,6 +111,8 @@
 
 (define-packet :pingresp)
 
+(define-packet :disconnect)
+
 (defun build-packet (buf message)
   (funcall (or (gethash (mqtt-message-type message) *mqtt-packet-builders*)
                (error "cannot build message of type ~s" (mqtt-message-type message)))

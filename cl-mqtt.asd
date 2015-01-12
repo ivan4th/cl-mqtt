@@ -7,10 +7,14 @@
   :license "TBD"
   :depends-on (:alexandria
                :iterate
-               :i4-diet-utils)
+               :babel
+               :i4-diet-utils
+               :cl-async
+               :blackbird)
   :components ((:file "package")
                (:file "specials")
                (:file "conditions")
                (:file "binary")
                (:file "frame")
-               (:file "message")))
+               (:file "message")
+               (:file "client")))
