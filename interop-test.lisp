@@ -111,14 +111,22 @@
           (wait-for messages)
           (is (equal '("foobar") messages)))))))
 
+(deftest test-ping () (interop-fixture)
+  (with-broker (host port error-cb)
+    (bb:alet ((conn (mqtt:connect host :port port :error-handler error-cb)))
+      (mqtt:ping conn))))
+
 ;; TBD: use 'observe'
 ;; TBD: multi-topic subscriptions
-;; TBD: subscribe errors
-;; TBD: failed connection (to an 'available' port)
-;; TBD: handle MQTT-ERRORs during message parsing (disconnect)
 ;; TBD: :event-cb for CONNECT is just TOO wrong
 ;; TBD: an option auto text decoding for payload (but handle babel decoding errors!)
-;; TBD: dup packets (perhaps not interop)
-;; TBD: max number of inflight messages
 ;; TBD: unclean session
 ;; TBD: will
+
+;; Separate tests with fake broker (non-interop):
+;; TBD: failed connection (to an 'available' port)
+;; TBD: dup packets
+;; TBD: handle MQTT-ERRORs during message parsing (disconnect)
+;; TBD: handle pings from server
+;; TBD: max number of inflight messages
+;; TBD: subscribe errors

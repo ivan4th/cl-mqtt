@@ -14,4 +14,5 @@
            #:publish
            #:subscribe
            #:unsubscribe
+           #:ping
            #:disconnect))

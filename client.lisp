@@ -1,6 +1,8 @@
 (in-package :cl-mqtt)
 
 (defparameter *default-response-timeout* 2) ;; FIXME
+(defparameter *default-keepalive* 60)
+(defparameter *default-ping-interval* 15)
 
 (defun %connect (host port read-cb write-cb later-error-cb)
   (bb:with-promise (resolve reject)
@@ -19,6 +21,7 @@
                                       :format-control "Connection failed: ~a"
                                       :format-arguments (list error)))))
              :connect-cb #'(lambda (socket)
+                             #++
                              (dbg "connected.")
                              (setf connected-p t)
                              (resolve socket))
@@ -32,6 +35,10 @@
    (next-mid :accessor next-mid :initform 1)
    (response-timeout :accessor response-timeout :initform *default-response-timeout*
                      :initarg :response-timeout)
+   (keepalive :accessor keepalive :initform *default-keepalive*
+              :initarg :keepalive)
+   (ping-interval :accessor ping-interval :initform *default-ping-interval*
+                  :initarg :ping-interval)
    (message-handlers :accessor message-handlers :initform '())
    (error-handler :accessor error-handler
                   :initarg :error-handler
@@ -41,7 +48,8 @@
    (on-message :accessor on-message
                :initform #'(lambda (message)
                              (format *debug-io* "~&incoming mqtt message: ~s~%" message))
-               :initarg :on-message)))
+               :initarg :on-message)
+   (ping-stopper :accessor ping-stopper)))
 
 (defun get-next-mid (client)
   ;; FIXME: should keep track of 'in-flight' message ids, etc.
@@ -78,6 +86,7 @@
 
 (defun handle-packet (client buf var-header-start)
   (let ((message (parse-packet buf var-header-start)))
+    #++
     (dbg "recv: ~s ~s" (mqtt-message-type message) message)
     (iter (for item in (message-handlers client))
           (destructuring-bind (pred callback permanent-p)
@@ -120,6 +129,7 @@
             #'(lambda ()
                 (as:free-event delay)
                 (setf (write-callback client) nil)
+                #++
                 (dbg "sent ~s: ~s" (mqtt-message-type message) message)
                 (resolve)))
       (%send-message client message)
@@ -153,7 +163,7 @@
                       :connect-will-qos 0
                       :connect-will-flag 0
                       :connect-clean-session-flag 1
-                      :connect-keepalive 60
+                      :connect-keepalive (keepalive client)
                       :client-id "cl-mqtt")))
 
 (defun handle-publish (client message)
@@ -175,8 +185,13 @@
          (as:with-delay () (funcall (on-message client) message))
          (send-message client (make-mqtt-message :type :pubcomp :mid mid)))))))
 
-(defun connect (host &rest initargs &key (port 1883) response-timeout error-handler on-message)
-  (declare (ignore response-timeout error-handler on-message)) ;; passed via initargs
+(defun handle-ping (client)
+  (send-message client (make-mqtt-message :type :pingresp)))
+
+(defun connect (host &rest initargs &key (port 1883) response-timeout error-handler on-message
+                                      keepalive ping-interval)
+  (declare (ignore response-timeout error-handler on-message
+                   keepalive ping-interval)) ; passed via initargs
   (let (client)
     (bb:alet ((socket (%connect host port
                                 #'(lambda (socket bytes)
@@ -193,16 +208,25 @@
                                    #'(lambda (buf var-header-start)
                                        (handle-packet client buf var-header-start)))
                           (remove-from-plist initargs :port)))
+      (setf (ping-stopper client)
+            (as:with-interval ((ping-interval client))
+              (ping client)))
+      ;; TBD: perhaps should just check for :PUBLISH and :PINGREQ
+      ;; in HANDLE-PACKET instead of using 'permanent' handlers
       (push-message-handler client
                             :publish
                             #'(lambda (message)
-                                (handle-publish client message)
-                                t)
+                                (handle-publish client message))
+                            :permanent-p t)
+      (push-message-handler client
+                            :pingreq
+                            #'(lambda (message)
+                                (declare (ignore message))
+                                (handle-ping client))
                             :permanent-p t)
       (bb:chain
           (wait-for-message client :connack)
         (:then (message)
-          (:printv (mqtt-message-ret-code message))
           (unless (eq :accepted (mqtt-message-ret-code message))
             (handle-connection-error "CONNECT rejected with ret code ~s"
                                      (mqtt-message-ret-code message)))))
@@ -246,9 +270,7 @@
               (mqtt-message-mid response)))))
 
 (defun ping (client)
-  (send-message
-   client
-   (make-mqtt-message :type :pingreq)))
+  (talk client (make-mqtt-message :type :pingreq) :pingresp))
 
 (defun publish (client topic payload &key (qos 0) (retain nil))
   (check-type payload (or string (vector (unsigned-byte 8))))
@@ -277,6 +299,7 @@
 
 (defun %disconnect (client)
   (setf (message-handlers client) '())
+  (funcall (ping-stopper client))
   (unless (as:streamish-closed-p (socket client))
     (as:close-socket (socket client)))
   (values))
@@ -285,7 +308,7 @@
   (bb:wait
       (send-message client (make-mqtt-message :type :disconnect))
     (%disconnect client)
-    (:printv :disconnected)
+    #++
     (as:dump-event-loop-status)
     (values)))
 
