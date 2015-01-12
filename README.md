@@ -4,7 +4,7 @@ MQTT driver for cl-async.
 messaging protocol. It's much simpler than complex messaging protocols
 like AMQP but nevertheless may be quite handy for Internet of Things
 and many other tasks. Among other things, it supports nice WebSocket
-incapsulation which may be later added to this driver, too.
+encapsulation which may be later added to this driver, too.
 
 Example code:
 ```cl
