@@ -26,7 +26,7 @@
      (:type :connect
       :dup 0
       :qos 0
-      :retain 0
+      :retain nil
       :protocol-name "MQTT"
       :protocol-level 4
       :connect-username-flag 0
@@ -59,7 +59,7 @@
      (:type :connect
       :dup 0
       :qos 0
-      :retain 0
+      :retain nil
       :protocol-name "MQIsdp"
       :protocol-level 3
       :connect-username-flag 0
@@ -79,7 +79,7 @@
      (:type :connack
       :dup 0
       :qos 0
-      :retain 0
+      :retain nil
       :ret-code :accepted))
 
     (:subscribe
@@ -93,7 +93,7 @@
      (:type :subscribe
       :dup 0
       :qos 1
-      :retain 0
+      :retain nil
       :mid 1
       :topic "#"
       :subscription-qos 0))
@@ -107,7 +107,7 @@
      (:type :suback
       :dup 0
       :qos 0
-      :retain 0
+      :retain nil
       :mid 1
       :subscription-qos 0))
 
@@ -126,7 +126,7 @@
      (:type :publish
       :dup 0
       :qos 0
-      :retain 1
+      :retain t
       :topic "/devices/zonebeast011c/meta/name"
       :payload #.(babel:string-to-octets "Zone Beast 01:1c" :encoding :utf-8)))
 
@@ -146,7 +146,7 @@
      (:type :publish
       :dup 0
       :qos 1
-      :retain 1
+      :retain t
       :topic "/devices/zonebeast011c/meta/name"
       :mid 2
       :payload #.(babel:string-to-octets "Zone Beast 01:1c" :encoding :utf-8)))
@@ -163,10 +163,18 @@
      (:type :publish
       :dup 0
       :qos 2
-      :retain 1
+      :retain t
       :topic "/d/z"
       :mid 515
       :payload #(#x31)))
+
+    (:puback
+     #(#x40 ;; Fixed header, message type=0x04 (PUBACK)
+       #x02 ;; Remaining length=2
+       #x02 #x04 ;; Message ID=516
+       )
+     (:type :puback
+      :mid 516))
 
     (:pingreq
      #(#xc0 ;; Fixed header, message type=0x0c (PINGREQ)
@@ -222,7 +230,6 @@
                                 :fill-pointer 0
                                 :adjustable t)))
       (mqtt::build-packet buf message)
-      (dbg-show buf)
       (is (equalp (message-test-packet message-test) buf)))))
 
 (deftest test-packet-parsing () ()

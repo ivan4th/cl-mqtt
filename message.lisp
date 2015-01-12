@@ -46,10 +46,13 @@
       (aref *ret-codes* ret-code)
       (error "invalid connack ret code ~s" ret-code)))
 
+(defun bool-from-raw (value) (plusp value))
+(defun bool-to-raw (value) (if value 1 0))
+
 (define-message-accessor type fixed-header 4 4 packet-type-from-raw packet-type-to-raw)
 (define-message-accessor dup fixed-header 1 3)
 (define-message-accessor qos fixed-header 2 1)
-(define-message-accessor retain fixed-header 1 0)
+(define-message-accessor retain fixed-header 1 0 bool-from-raw bool-to-raw)
 
 (define-message-accessor connect-username-flag connect-flags 1 7)
 (define-message-accessor connect-password-flag connect-flags 1 6)
@@ -72,7 +75,7 @@
         (funcall setter v msg)))
     msg))
 
-;; TBD: optional third item in field spec may specify condition
+;; Optional third item in field spec may specify condition
 ;; for optional fields. Condition may be just a field name.
 ;; The optional field must be present if cond field is > 0
 ;; (this will work for QoS, too)
@@ -95,6 +98,9 @@
   (topic :str)
   (mid :u16 qos)
   (payload :bytes))
+
+(define-packet :puback
+  (mid :u16))
 
 ;; FIXME: actually, it's possible to subscribe for multiple topics
 ;; via the single request

@@ -37,7 +37,11 @@
                   :initarg :error-handler
                   :initform #'(lambda (error)
                                 (warn "MQTT error: ~a" error)))
-   (write-callback :accessor write-callback :initform nil)))
+   (write-callback :accessor write-callback :initform nil)
+   (on-message :accessor on-message
+               :initform #'(lambda (message)
+                             (format *debug-io* "~&incoming mqtt message: ~s~%" message))
+               :initarg :on-message)))
 
 (defun get-next-mid (client)
   ;; FIXME: should keep track of 'in-flight' message ids, etc.
@@ -138,7 +142,7 @@
    (make-mqtt-message :type :connect
                       :dup 0
                       :qos 0
-                      :retain 0
+                      :retain nil
                       :protocol-name "MQTT"
                       :protocol-level 4
                       :connect-username-flag 0
@@ -149,8 +153,21 @@
                       :connect-keepalive 60
                       :client-id "cl-mqtt")))
 
-(defun connect (host &rest initargs &key (port 1883) response-timeout error-handler)
-  (declare (ignore response-timeout error-handler)) ;; passed via initargs
+(defun handle-publish (client message)
+  (case (mqtt-message-qos message)
+    (0
+     (funcall (on-message client) message))
+    (1
+     ;; make sure the :puback is written to the socket
+     ;; so disconnect will not kill it
+     (bb:wait (send-message client (make-mqtt-message
+                                    :type :puback
+                                    :mid (mqtt-message-mid message)))
+       (funcall (on-message client) message)))
+    (2 (error "TBD"))))
+
+(defun connect (host &rest initargs &key (port 1883) response-timeout error-handler on-message)
+  (declare (ignore response-timeout error-handler on-message)) ;; passed via initargs
   (let (client)
     (bb:alet ((socket (%connect host port
                                 #'(lambda (socket bytes)
@@ -167,6 +184,10 @@
                                    #'(lambda (buf var-header-start)
                                        (handle-packet client buf var-header-start)))
                           (remove-from-plist initargs :port)))
+      (push-message-handler client :publish
+                            #'(lambda (message)
+                                (handle-publish client message)
+                                t))
       (bb:chain
           (wait-for-message client :connack)
         (:then (message)
@@ -189,7 +210,7 @@
                  :type :subscribe
                  :dup 0
                  :qos 1 ;; that's QoS for SUBSCRIBE command itself, not subscription
-                 :retain 0
+                 :retain nil
                  :mid mid
                  :topic topic
                  :subscription-qos qos)
@@ -205,17 +226,26 @@
    client
    (make-mqtt-message :type :pingreq)))
 
-(defun publish (client topic payload)
-  (send-message
-   client
-   (make-mqtt-message
-    :type :publish
-    :dup 0
-    :qos 0
-    :retain 0
-    ;; TBD: mid for non-zero qos
-    :topic topic
-    :payload payload)))
+(defun publish (client topic payload &key (qos 0) (retain nil))
+  (check-type payload (or string (vector (unsigned-byte 8))))
+  (let ((mid (if (plusp qos) (get-next-mid client) 0)))
+    (bb:wait (send-message
+              client
+              (make-mqtt-message
+               :type :publish
+               :dup 0
+               :qos qos
+               :retain retain
+               :mid mid
+               :topic topic
+               :payload (if (stringp payload)
+                            (babel:string-to-octets payload :encoding :utf-8)
+                            payload)))
+      (case qos
+        (1 (wait-for-message client #'(lambda (message)
+                                        (and (eq :puback (mqtt-message-type message))
+                                             (= mid (mqtt-message-mid message))))))
+        (2 (error "TBD"))))))
 
 (defun %disconnect (client)
   (setf (message-handlers client) '())
@@ -233,3 +263,4 @@
 
 ;; TBD: auto-ping
 ;; TBD: look for 'coverate statements not found' in the broker output (myself, not in code)
+;; TBD: look for 'ERROR' in broker output (in the code)
