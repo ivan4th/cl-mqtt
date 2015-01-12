@@ -62,8 +62,13 @@
 (deftest test-publish-qos1 () (interop-fixture)
   (verify-publish 1 nil))
 
+(deftest test-publish-qos2 () (interop-fixture)
+  (verify-publish 2 nil))
+
+;; TBD: unsubscribe, unsuback
 ;; TBD: retained messages for each QoS level
-;;      (perhaps better just use two publish calls in each VERIFY-PUBLISH)
+;;      (perhaps better just use two publish calls in each VERIFY-PUBLISH;
+;;      also, reconnect & make sure the messages are there)
 ;; TBD: use 'observe'
 ;; TBD: multi-topic subscriptions
 ;; TBD: subscribe errors
@@ -72,3 +77,4 @@
 ;; TBD: as:dump-event-loop-status at the end giving many handles?
 ;; TBD: an option auto text decoding for payload (but handle babel decoding errors!)
 ;; TBD: dup packets (perhaps not interop)
+;; TBD: max number of inflight messages

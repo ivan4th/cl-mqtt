@@ -102,6 +102,15 @@
 (define-packet :puback
   (mid :u16))
 
+(define-packet :pubrec
+  (mid :u16))
+
+(define-packet :pubrel
+  (mid :u16))
+
+(define-packet :pubcomp
+  (mid :u16))
+
 ;; FIXME: actually, it's possible to subscribe for multiple topics
 ;; via the single request
 (define-packet :subscribe

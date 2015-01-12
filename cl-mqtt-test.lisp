@@ -82,35 +82,6 @@
       :retain nil
       :ret-code :accepted))
 
-    (:subscribe
-     #(#x82 ;; Fixed header, message type=0x08 (SUBSCRIBE), DUP=0, QoS=1, Retain=0
-       #x06 ;; Remaining length=6
-       #x00 #x01 ;; Message ID=1
-       #x00 #x01 ;; Topic len=1
-       #x23      ;; Topic: '#'
-       #x00      ;; Requested QoS = 0 (use lower 2 bits)
-       )
-     (:type :subscribe
-      :dup 0
-      :qos 1
-      :retain nil
-      :mid 1
-      :topic "#"
-      :subscription-qos 0))
-
-    (:suback
-     #(#x90 ;; Fixed header, message type=0x08 (SUBACK), DUP=0, QoS=0, Retain=0
-       #x03 ;; Remaining length=3
-       #x00 #x01 ;; Message ID=1
-       #x00      ;; Granted QoS=0 (use lower 2 bits)
-       )
-     (:type :suback
-      :dup 0
-      :qos 0
-      :retain nil
-      :mid 1
-      :subscription-qos 0))
-
     (:publish
      #(#x31 ;; Fixed header, message type=0x03 (PUBLISH), DUP=0, QoS=0, Retain=1
        #x32 ;; Remaining length=50
@@ -175,6 +146,61 @@
        )
      (:type :puback
       :mid 516))
+
+    (:pubrec
+     #(#x50 ;; Fixed header, message type=0x05 (PUBREC)
+       #x02 ;; Remaining length=2
+       #x02 #x05 ;; Message ID=517
+       )
+     (:type :pubrec
+      :mid 517))
+
+    (:pubrel
+     #(#x62 ;; Fixed header, message type=0x06 (PUBREL), QoS=1
+       #x02 ;; Remaining length=2
+       #x02 #x05 ;; Message ID=517
+       )
+     (:type :pubrel
+      :mid 517
+      :qos 1))
+
+    (:pubcomp
+     #(#x70 ;; Fixed header, message type=0x07 (PUBCOMP)
+       #x02 ;; Remaining length=2
+       #x02 #x05 ;; Message ID=517
+       )
+     (:type :pubcomp
+      :mid 517))
+
+    (:subscribe
+     #(#x82 ;; Fixed header, message type=0x08 (SUBSCRIBE), DUP=0, QoS=1, Retain=0
+       #x06 ;; Remaining length=6
+       #x00 #x01 ;; Message ID=1
+       #x00 #x01 ;; Topic len=1
+       #x23      ;; Topic: '#'
+       #x00      ;; Requested QoS = 0 (use lower 2 bits)
+       )
+     (:type :subscribe
+      :dup 0
+      :qos 1
+      :retain nil
+      :mid 1
+      :topic "#"
+      :subscription-qos 0))
+
+    (:suback
+     #(#x90 ;; Fixed header, message type=0x08 (SUBACK), DUP=0, QoS=0, Retain=0
+       #x03 ;; Remaining length=3
+       #x00 #x01 ;; Message ID=1
+       #x00      ;; Granted QoS=0 (use lower 2 bits)
+       )
+
+     (:type :suback
+      :dup 0
+      :qos 0
+      :retain nil
+      :mid 1
+      :subscription-qos 0))
 
     (:pingreq
      #(#xc0 ;; Fixed header, message type=0x0c (PINGREQ)

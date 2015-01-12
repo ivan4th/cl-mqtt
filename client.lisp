@@ -61,12 +61,16 @@
     (funcall (error-handler client) error))
   error)
 
-(defun push-message-handler (client pred-or-msg-type callback)
+(defun push-message-handler (client match callback)
   (let ((pred
-          (if (functionp pred-or-msg-type)
-              pred-or-msg-type
-              #'(lambda (message)
-                  (eq pred-or-msg-type (mqtt-message-type message))))))
+          (etypecase match
+            (function match)
+            (keyword #'(lambda (message)
+                         (eq match (mqtt-message-type message))))
+            ((cons keyword (integer 0 65535))
+             #'(lambda (message)
+                 (and (eq (car match) (mqtt-message-type message))
+                      (eq (cdr match) (mqtt-message-mid message))))))))
     (push (cons pred callback) (message-handlers client))))
 
 (defun remove-message-handler (client handler)
@@ -86,14 +90,10 @@
               (dolist (callback callbacks)
                 (funcall callback message)))))))
 
-(defun wait-for-message (client pred-or-msg-type)
+(defun wait-for-message (client pred)
   (bb:with-promise (resolve reject)
     (let (delay)
-      (labels ((matches-p (message)
-                 (if (functionp pred-or-msg-type)
-                     (funcall pred-or-msg-type message)
-                     (eq pred-or-msg-type (mqtt-message-type message))))
-               (handle (message)
+      (labels ((handle (message)
                  (as:free-event delay)
                  (resolve message)))
         (setf delay
@@ -101,7 +101,7 @@
                 (remove-message-handler client #'handle)
                 (reject
                  (handle-connection-error client "connection timed out"))))
-        (push-message-handler client #'matches-p #'handle)))))
+        (push-message-handler client pred #'handle)))))
 
 ;; FIXME: use thread-specific buffer
 (defun %send-message (client message)
@@ -154,17 +154,23 @@
                       :client-id "cl-mqtt")))
 
 (defun handle-publish (client message)
-  (case (mqtt-message-qos message)
-    (0
-     (funcall (on-message client) message))
-    (1
-     ;; make sure the :puback is written to the socket
-     ;; so disconnect will not kill it
-     (bb:wait (send-message client (make-mqtt-message
-                                    :type :puback
-                                    :mid (mqtt-message-mid message)))
-       (funcall (on-message client) message)))
-    (2 (error "TBD"))))
+  (let ((mid (mqtt-message-mid message)))
+    (case (mqtt-message-qos message)
+      (0
+       (funcall (on-message client) message))
+      (1
+       ;; make sure the :puback is written to the socket
+       ;; so disconnect will not kill it
+       (bb:wait (send-message client (make-mqtt-message :type :puback :mid mid))
+         (funcall (on-message client) message)))
+      (2
+       (bb:walk
+         (send-message client (make-mqtt-message :type :pubrec :mid mid))
+         (wait-for-message client (cons :pubrel mid))
+         ;; FIXME: the delay should not be necessary here
+         ;; https://github.com/orthecreedence/blackbird/issues/16
+         (as:with-delay () (funcall (on-message client) message))
+         (send-message client (make-mqtt-message :type :pubcomp :mid mid)))))))
 
 (defun connect (host &rest initargs &key (port 1883) response-timeout error-handler on-message)
   (declare (ignore response-timeout error-handler on-message)) ;; passed via initargs
@@ -214,10 +220,7 @@
                  :mid mid
                  :topic topic
                  :subscription-qos qos)
-                #'(lambda (message)
-                    (dbg "expect mid ~s got ~s" mid (mqtt-message-mid message))
-                    (and (eq :suback (mqtt-message-type message))
-                         (= mid (mqtt-message-mid message)))))))
+                (cons :suback mid))))
       (values (mqtt-message-subscription-qos response)
               (mqtt-message-mid response)))))
 
@@ -242,10 +245,14 @@
                             (babel:string-to-octets payload :encoding :utf-8)
                             payload)))
       (case qos
-        (1 (wait-for-message client #'(lambda (message)
-                                        (and (eq :puback (mqtt-message-type message))
-                                             (= mid (mqtt-message-mid message))))))
-        (2 (error "TBD"))))))
+        (1 (wait-for-message client (cons :puback mid)))
+        (2 (bb:walk
+             (wait-for-message client (cons :pubrec mid))
+             (send-message client (make-mqtt-message
+                                   :type :pubrel
+                                   :qos 1
+                                   :mid mid))
+             (wait-for-message client (cons :pubcomp mid))))))))
 
 (defun %disconnect (client)
   (setf (message-handlers client) '())
