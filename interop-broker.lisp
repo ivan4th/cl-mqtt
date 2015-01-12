@@ -72,7 +72,7 @@
 
 (defmacro wait-for (expr &body body)
   `(%wait-for #'(lambda () ,expr)
-              ,(when body `#'(lambda () ,@body))))
+     ,(when body `#'(lambda () ,@body))))
 
 (defun start-broker ()
   (unless *broker-process*

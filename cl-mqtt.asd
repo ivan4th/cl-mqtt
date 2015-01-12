@@ -10,7 +10,9 @@
                :babel
                :i4-diet-utils
                :cl-async
-               :blackbird)
+               :blackbird
+               ;; FIXME: rm printv
+               :printv)
   :components ((:file "package")
                (:file "specials")
                (:file "conditions")

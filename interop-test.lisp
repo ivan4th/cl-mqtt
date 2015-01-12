@@ -34,41 +34,62 @@
           (sub "/c/d" nil 4)
           (mqtt:disconnect conn))))))
 
-(defun verify-publish (qos retain)
+(defun verify-publish (qos)
   (with-broker (host port error-cb)
     (let ((messages '())
           (expected-mid (if (plusp qos) 1 0)))
-      (bb:alet ((conn (mqtt:connect
-                       host
-                       :port port
-                       :error-handler error-cb
-                       :on-message #'(lambda (message)
-                                       (is (= qos (mqtt:mqtt-message-qos message)))
-                                       (is (= expected-mid (mqtt:mqtt-message-mid message)))
-                                       (is (eq retain (mqtt:mqtt-message-retain message)))
-                                       (push (list (mqtt:mqtt-message-topic message)
-                                                   (babel:octets-to-string
-                                                    (mqtt:mqtt-message-payload message)
-                                                    :encoding :utf-8))
-                                             messages)))))
-        (bb:walk (mqtt:subscribe conn "/a/#")
-          (mqtt:publish conn "/a/b/c" "42" :qos qos :retain retain)
-          (bb:wait (wait-for messages)
-            (is (equal '(("/a/b/c" "42")) (nreverse messages)))))))))
+      (flet ((connect ()
+               (mqtt:connect host
+                             :port port
+                             :error-handler error-cb
+                             :on-message
+                             #'(lambda (message)
+                                 (dbg "on-messsage: ~s" message)
+                                 (is (= qos (mqtt:mqtt-message-qos message)))
+                                 (is (= expected-mid (mqtt:mqtt-message-mid message)))
+                                 (push (list (mqtt:mqtt-message-topic message)
+                                             (babel:octets-to-string
+                                              (mqtt:mqtt-message-payload message)
+                                              :encoding :utf-8)
+                                             (mqtt:mqtt-message-retain message))
+                                       messages)))))
+        (bb:alet ((conn (connect)))
+          (bb:walk (mqtt:subscribe conn "/a/#")
+            (mqtt:publish conn "/a/b/c" "42" :qos qos :retain nil)
+            (bb:wait (wait-for messages)
+              (is (equal '(("/a/b/c" "42" nil)) (nreverse (shiftf messages nil))))
+              (when (plusp qos)
+                (incf expected-mid))
+              (bb:wait
+                  (mqtt:publish conn "/a/b/d" "4242" :qos qos :retain t)
+                ;; expected-retain is still NIL.
+                ;; The broker publishes the message back without the retain bit
+                ;; because it isn't published as the result of new subscription.
+                (bb:wait (wait-for messages)
+                  (is (equal '(("/a/b/d" "4242" nil))
+                             (nreverse (shiftf messages nil))))
+                  ;; reconnect and look for the retained message
+                  (bb:wait (mqtt:disconnect conn)
+                    (bb:alet ((conn (connect)))
+                      (when (plusp qos)
+                        (setf expected-mid 1))
+                      (bb:walk
+                        (mqtt:subscribe conn "/a/#")
+                        (bb:wait (wait-for messages)
+                          (is (equal '(("/a/b/d" "4242" t))
+                                     (nreverse (shiftf messages nil))))
+                          (mqtt:disconnect conn))))))))))))))
 
 (deftest test-publish-qos0 () (interop-fixture)
-  (verify-publish 0 nil))
+  (verify-publish 0))
 
 (deftest test-publish-qos1 () (interop-fixture)
-  (verify-publish 1 nil))
+  (verify-publish 1))
 
 (deftest test-publish-qos2 () (interop-fixture)
-  (verify-publish 2 nil))
+  (verify-publish 2))
 
 ;; TBD: unsubscribe, unsuback
-;; TBD: retained messages for each QoS level
-;;      (perhaps better just use two publish calls in each VERIFY-PUBLISH;
-;;      also, reconnect & make sure the messages are there)
 ;; TBD: use 'observe'
 ;; TBD: multi-topic subscriptions
 ;; TBD: subscribe errors

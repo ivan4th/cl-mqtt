@@ -61,7 +61,7 @@
     (funcall (error-handler client) error))
   error)
 
-(defun push-message-handler (client match callback)
+(defun push-message-handler (client match callback &key permanent-p)
   (let ((pred
           (etypecase match
             (function match)
@@ -71,21 +71,27 @@
              #'(lambda (message)
                  (and (eq (car match) (mqtt-message-type message))
                       (eq (cdr match) (mqtt-message-mid message))))))))
-    (push (cons pred callback) (message-handlers client))))
+    (push (list pred callback permanent-p) (message-handlers client))))
 
 (defun remove-message-handler (client handler)
-  (deletef (message-handlers client) handler))
+  (deletef (message-handlers client) handler :key #'second))
 
 (defun handle-packet (client buf var-header-start)
   (let ((message (parse-packet buf var-header-start)))
+    (dbg "recv: ~s ~s~%~s" message
+         (mqtt-message-type message)
+         (message-handlers client))
     (iter (for item in (message-handlers client))
-          (destructuring-bind (pred . callback)
+          (destructuring-bind (pred callback permanent-p)
               item
-            (if (funcall pred message)
-                (collect callback into callbacks)
-                (collect item into new-handlers)))
+            (let ((match-p (funcall pred message)))
+              (when match-p
+                (collect callback into callbacks))
+              (when (or (not match-p) permanent-p)
+                (collect item into new-handlers))))
           (finally
             (setf (message-handlers client) new-handlers)
+            ;; TBD: shouldn't need delay here if blackbird is fixed
             (as:with-delay ()
               (dolist (callback callbacks)
                 (funcall callback message)))))))
@@ -111,7 +117,7 @@
 
 (defun send-message (client message)
   (let (delay)
-    (bb:with-promise (resolve reject)
+    (bb:with-promise (resolve reject :name "SEND-MESSAGE-PROMISE")
       (setf (write-callback client)
             #'(lambda ()
                 (as:free-event delay)
@@ -121,7 +127,6 @@
       (%send-message client message)
       (setf delay
             (as:with-delay ((response-timeout client)) ;; FIXME: add write-timeout
-              (:printv :write-timeout)
               (setf (write-callback client) nil)
               (%disconnect client)
               (reject (make-condition 'mqtt-error
@@ -190,10 +195,12 @@
                                    #'(lambda (buf var-header-start)
                                        (handle-packet client buf var-header-start)))
                           (remove-from-plist initargs :port)))
-      (push-message-handler client :publish
+      (push-message-handler client
+                            :publish
                             #'(lambda (message)
                                 (handle-publish client message)
-                                t))
+                                t)
+                            :permanent-p t)
       (bb:chain
           (wait-for-message client :connack)
         (:then (message)
