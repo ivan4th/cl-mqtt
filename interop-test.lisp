@@ -89,13 +89,36 @@
 (deftest test-publish-qos2 () (interop-fixture)
   (verify-publish 2))
 
-;; TBD: unsubscribe, unsuback
+(deftest test-unsubscribe () (interop-fixture)
+  (with-broker (host port error-cb)
+    (let ((messages '()))
+      (bb:alet ((conn (mqtt:connect host
+                                    :port port
+                                    :error-handler error-cb
+                                    :on-message #'(lambda (message)
+                                                    (push (babel:octets-to-string
+                                                           (mqtt:mqtt-message-payload message)
+                                                           :encoding :utf-8)
+                                                          messages)))))
+        (bb:walk
+          (mqtt:subscribe conn "/a/#")
+          (mqtt:subscribe conn "/b/#")
+          (mqtt:unsubscribe conn "/a/#")
+          (mqtt:publish conn "/a/b" "whatever")
+          (mqtt:publish conn "/b/c" "foobar")
+          ;; "foobar" goes after whatever, so, if "foobar" was received,
+          ;; "whatever" is already skipped
+          (wait-for messages)
+          (is (equal '("foobar") messages)))))))
+
 ;; TBD: use 'observe'
 ;; TBD: multi-topic subscriptions
 ;; TBD: subscribe errors
 ;; TBD: failed connection (to an 'available' port)
+;; TBD: handle MQTT-ERRORs during message parsing (disconnect)
 ;; TBD: :event-cb for CONNECT is just TOO wrong
-;; TBD: as:dump-event-loop-status at the end giving many handles?
 ;; TBD: an option auto text decoding for payload (but handle babel decoding errors!)
 ;; TBD: dup packets (perhaps not interop)
 ;; TBD: max number of inflight messages
+;; TBD: unclean session
+;; TBD: will

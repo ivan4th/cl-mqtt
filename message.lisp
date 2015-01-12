@@ -122,6 +122,13 @@
   (mid :u16)
   (subscription-qos-raw :u8))
 
+(define-packet :unsubscribe
+  (mid :u16)
+  (topic :str))
+
+(define-packet :unsuback
+  (mid :u16))
+
 (define-packet :pingreq)
 
 (define-packet :pingresp)

@@ -189,18 +189,43 @@
       :subscription-qos 0))
 
     (:suback
-     #(#x90 ;; Fixed header, message type=0x08 (SUBACK), DUP=0, QoS=0, Retain=0
+     #(#x90 ;; Fixed header, message type=0x09 (SUBACK), DUP=0, QoS=0, Retain=0
        #x03 ;; Remaining length=3
        #x00 #x01 ;; Message ID=1
        #x00      ;; Granted QoS=0 (use lower 2 bits)
        )
-
      (:type :suback
       :dup 0
       :qos 0
       :retain nil
       :mid 1
       :subscription-qos 0))
+
+    (:unsubscribe
+     #(#xa2 ;; Fixed header, message type=0x0a (UNSUBSCRIBE), DUP=0, QoS=1, Retain=0
+       #x05 ;; Remaining length=5
+       #x00 #x01 ;; Message ID=1
+       #x00 #x01 ;; Topic len=1
+       #x23      ;; Topic: '#'
+       )
+     (:type :unsubscribe
+      :dup 0
+      :qos 1
+      :retain nil
+      :mid 1
+      :topic "#"
+      :subscription-qos 0))
+
+    (:unsuback
+     #(#xb0 ;; Fixed header, message type=0x0b (UNSUBACK), DUP=0, QoS=0, Retain=0
+       #x02 ;; Remaining length=2
+       #x00 #x01 ;; Message ID=1
+       )
+     (:type :unsuback
+      :dup 0
+      :qos 0
+      :retain nil
+      :mid 1))
 
     (:pingreq
      #(#xc0 ;; Fixed header, message type=0x0c (PINGREQ)

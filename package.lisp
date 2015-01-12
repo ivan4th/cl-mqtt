@@ -13,4 +13,5 @@
            #:connect
            #:publish
            #:subscribe
+           #:unsubscribe
            #:disconnect))

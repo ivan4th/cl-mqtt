@@ -78,9 +78,7 @@
 
 (defun handle-packet (client buf var-header-start)
   (let ((message (parse-packet buf var-header-start)))
-    (dbg "recv: ~s ~s~%~s" message
-         (mqtt-message-type message)
-         (message-handlers client))
+    (dbg "recv: ~s ~s" (mqtt-message-type message) message)
     (iter (for item in (message-handlers client))
           (destructuring-bind (pred callback permanent-p)
               item
@@ -228,6 +226,22 @@
                  :topic topic
                  :subscription-qos qos)
                 (cons :suback mid))))
+      (values (mqtt-message-subscription-qos response)
+              (mqtt-message-mid response)))))
+
+(defun unsubscribe (client topic)
+  (let ((mid (get-next-mid client)))
+    (bb:alet ((response
+               (talk
+                client
+                (make-mqtt-message
+                 :type :unsubscribe
+                 :dup 0
+                 :qos 1 ;; that's QoS for UNSUBSCRIBE command itself, not subscription
+                 :retain nil
+                 :mid mid
+                 :topic topic)
+                (cons :unsuback mid))))
       (values (mqtt-message-subscription-qos response)
               (mqtt-message-mid response)))))
 
