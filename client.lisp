@@ -314,14 +314,14 @@
   (values))
 
 (defun disconnect (client)
-  (bb:wait
-      (send-message client (make-mqtt-message :type :disconnect))
+  (bb:finally
+      (bb:chain
+          (send-message client (make-mqtt-message :type :disconnect))
+        (:then () (values)))
     (%disconnect client)
     #++
-    (as:dump-event-loop-status)
-    (values)))
+    (as:dump-event-loop-status)))
 
-;; TBD: don't fail to disconnect upon timeout, just show warning
 ;; TBD: auto-ping
 ;; TBD: look for 'coverate statements not found' in the broker output (myself, not in code)
 ;; TBD: look for 'ERROR' in broker output (in the code)
