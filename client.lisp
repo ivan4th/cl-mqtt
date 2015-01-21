@@ -45,6 +45,7 @@
                   :initform #'(lambda (error)
                                 (warn "MQTT error: ~a" error)))
    (write-callback :accessor write-callback :initform nil)
+   (write-finished-promise :accessor write-finished-promise :initform nil)
    (on-message :accessor on-message
                :initform #'(lambda (message)
                              (format *debug-io* "~&incoming mqtt message: ~s~%" message))
@@ -123,22 +124,30 @@
     (as:write-socket-data (socket client) buf)))
 
 (defun send-message (client message)
-  (let (delay)
-    (bb:with-promise (resolve reject :name "SEND-MESSAGE-PROMISE")
-      (setf (write-callback client)
-            #'(lambda ()
-                (as:free-event delay)
-                (setf (write-callback client) nil)
-                #++
-                (dbg "sent ~s: ~s" (mqtt-message-type message) message)
-                (resolve)))
-      (%send-message client message)
-      (setf delay
-            (as:with-delay ((response-timeout client)) ;; FIXME: add write-timeout
-              (setf (write-callback client) nil)
-              (%disconnect client)
-              (reject (make-condition 'mqtt-error
-                                      :format-control "Timed out writing")))))))
+  (setf (write-finished-promise client)
+        (flet ((actually-send ()
+                 (let (delay)
+                   (bb:with-promise (resolve reject :name "SEND-MESSAGE-PROMISE")
+                     (setf (write-callback client)
+                           #'(lambda ()
+                               (as:free-event delay)
+                               (setf (write-callback client) nil
+                                     (write-finished-promise client) nil)
+                               #++
+                               (dbg "sent ~s: ~s" (mqtt-message-type message) message)
+                               (resolve)))
+                     (%send-message client message)
+                     (setf delay
+                           (as:with-delay ((response-timeout client)) ;; FIXME: add write-timeout
+                             (setf (write-callback client) nil
+                                   (write-finished-promise client) nil)
+                             (%disconnect client)
+                             (let ((condition (make-condition 'mqtt-error
+                                                              :format-control "Timed out writing")))
+                               (reject condition))))))))
+          (if (null (write-finished-promise client))
+              (actually-send)
+              (bb:attach (write-finished-promise client) #'actually-send)))))
 
 (defun talk (client message pred-or-msg-type)
   "Send a message and wait for reply"
@@ -312,6 +321,7 @@
     (as:dump-event-loop-status)
     (values)))
 
+;; TBD: don't fail to disconnect upon timeout, just show warning
 ;; TBD: auto-ping
 ;; TBD: look for 'coverate statements not found' in the broker output (myself, not in code)
 ;; TBD: look for 'ERROR' in broker output (in the code)

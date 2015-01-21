@@ -36,8 +36,7 @@
 
 (defun verify-publish (qos)
   (with-broker (host port error-cb)
-    (let ((messages '())
-          (expected-mid (if (plusp qos) 1 0)))
+    (let ((messages '()))
       (flet ((connect ()
                (mqtt:connect host
                              :port port
@@ -46,38 +45,43 @@
                              #'(lambda (message)
                                  (dbg "on-messsage: ~s" message)
                                  (is (= qos (mqtt:mqtt-message-qos message)))
-                                 (is (= expected-mid (mqtt:mqtt-message-mid message)))
                                  (push (list (mqtt:mqtt-message-topic message)
                                              (babel:octets-to-string
                                               (mqtt:mqtt-message-payload message)
                                               :encoding :utf-8)
-                                             (mqtt:mqtt-message-retain message))
-                                       messages)))))
+                                             (mqtt:mqtt-message-retain message)
+                                             (mqtt:mqtt-message-mid message))
+                                       messages))))
+             (verify-messages (expected-messages)
+               (when (zerop qos)
+                 ;; in case of QoS=0, replace mids in expected messages with zeroes
+                 (setf expected-messages
+                       (iter (for (topic payload retain mid) in expected-messages)
+                             (collect (list topic payload retain 0)))))
+               (let ((actual-messages (nreverse (shiftf messages nil))))
+                 (is (equal expected-messages actual-messages)))))
         (bb:alet ((conn (connect)))
           (bb:walk (mqtt:subscribe conn "/a/#")
-            (mqtt:publish conn "/a/b/c" "42" :qos qos :retain nil)
+            (bb:all
+             (list
+              (mqtt:publish conn "/a/b/c" "42" :qos qos :retain nil)
+              (mqtt:publish conn "/a/b/c" "43" :qos qos :retain nil)))
             (bb:wait (wait-for messages)
-              (is (equal '(("/a/b/c" "42" nil)) (nreverse (shiftf messages nil))))
-              (when (plusp qos)
-                (incf expected-mid))
+              (verify-messages '(("/a/b/c" "42" nil 1) ("/a/b/c" "43" nil 2)))
               (bb:wait
                   (mqtt:publish conn "/a/b/d" "4242" :qos qos :retain t)
                 ;; expected-retain is still NIL.
                 ;; The broker publishes the message back without the retain bit
                 ;; because it isn't published as the result of new subscription.
                 (bb:wait (wait-for messages)
-                  (is (equal '(("/a/b/d" "4242" nil))
-                             (nreverse (shiftf messages nil))))
+                  (verify-messages '(("/a/b/d" "4242" nil 3)))
                   ;; reconnect and look for the retained message
                   (bb:wait (mqtt:disconnect conn)
                     (bb:alet ((conn (connect)))
-                      (when (plusp qos)
-                        (setf expected-mid 1))
                       (bb:walk
                         (mqtt:subscribe conn "/a/#")
                         (bb:wait (wait-for messages)
-                          (is (equal '(("/a/b/d" "4242" t))
-                                     (nreverse (shiftf messages nil))))
+                          (verify-messages '(("/a/b/d" "4242" t 1)))
                           (mqtt:disconnect conn))))))))))))))
 
 (deftest test-publish-qos0 () (interop-fixture)
@@ -116,6 +120,7 @@
     (bb:alet ((conn (mqtt:connect host :port port :error-handler error-cb)))
       (mqtt:ping conn))))
 
+;; TBD: test overlong messages
 ;; TBD: use 'observe'
 ;; TBD: multi-topic subscriptions
 ;; TBD: :event-cb for CONNECT is just TOO wrong
