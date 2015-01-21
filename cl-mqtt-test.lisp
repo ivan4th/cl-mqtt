@@ -35,7 +35,8 @@
       :connect-will-flag 0
       :connect-clean-session-flag 1
       :connect-keepalive 60
-      :client-id "mosqsub/10224-think"))
+      :client-id "mosqsub/10224-think")
+     2)
     #++
     (:connect
      #(#x10 ;; Fixed header, message type=0x01 (CONNECT), DUP=0, QoS=0, Retain=0
@@ -68,7 +69,8 @@
       :connect-will-flag 0
       :connect-clean-session-flag 1
       :connect-keepalive 60
-      :client-id "mosqsub/10224-think"))
+      :client-id "mosqsub/10224-think")
+     2)
 
     (:connack
      #(#x20 ;; Fixed header, message type=0x02 (CONNACK), DUP=0, QoS=0, Retain=0
@@ -80,7 +82,8 @@
       :dup 0
       :qos 0
       :retain nil
-      :ret-code :accepted))
+      :ret-code :accepted)
+     2)
 
     (:publish
      #(#x31 ;; Fixed header, message type=0x03 (PUBLISH), DUP=0, QoS=0, Retain=1
@@ -99,7 +102,8 @@
       :qos 0
       :retain t
       :topic "/devices/zonebeast011c/meta/name"
-      :payload #.(babel:string-to-octets "Zone Beast 01:1c" :encoding :utf-8)))
+      :payload #.(babel:string-to-octets "Zone Beast 01:1c" :encoding :utf-8))
+     2)
 
     (:publish1
      #(#x33 ;; Fixed header, message type=0x03 (PUBLISH), DUP=0, QoS=1, Retain=1
@@ -120,7 +124,8 @@
       :retain t
       :topic "/devices/zonebeast011c/meta/name"
       :mid 2
-      :payload #.(babel:string-to-octets "Zone Beast 01:1c" :encoding :utf-8)))
+      :payload #.(babel:string-to-octets "Zone Beast 01:1c" :encoding :utf-8))
+     2)
 
     (:publish2
      #(#x35 ;; Fixed header, message type=0x03 (PUBLISH), DUP=0, QoS=2, Retain=1
@@ -137,15 +142,61 @@
       :retain t
       :topic "/d/z"
       :mid 515
-      :payload #(#x31)))
+      :payload #(#x31))
+     2)
+
+    (:publish3
+     #(#x30 #x88 #x01 #x00 #x06 #x2F #x61 #x2F
+       #x62 #x2F #x63 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+       #x58 #x58 #x58)
+     (:type :publish
+      :dup 0
+      :qos 0
+      :retain nil
+      :mid 0
+      :topic "/a/b/c"
+      :payload
+      #(#x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58
+        #x58 #x58 #x58 #x58 #x58 #x58 #x58 #x58))
+     3)
 
     (:puback
-     #(#x40 ;; Fixed header, message type=0x04 (PUBACK)
-       #x02 ;; Remaining length=2
+     #(#x40      ;; Fixed header, message type=0x04 (PUBACK)
+       #x02      ;; Remaining length=2
        #x02 #x04 ;; Message ID=516
        )
      (:type :puback
-      :mid 516))
+      :mid 516)
+     2)
 
     (:pubrec
      #(#x50 ;; Fixed header, message type=0x05 (PUBREC)
@@ -153,7 +204,8 @@
        #x02 #x05 ;; Message ID=517
        )
      (:type :pubrec
-      :mid 517))
+      :mid 517)
+     2)
 
     (:pubrel
      #(#x62 ;; Fixed header, message type=0x06 (PUBREL), QoS=1
@@ -162,7 +214,8 @@
        )
      (:type :pubrel
       :mid 517
-      :qos 1))
+      :qos 1)
+     2)
 
     (:pubcomp
      #(#x70 ;; Fixed header, message type=0x07 (PUBCOMP)
@@ -170,7 +223,8 @@
        #x02 #x05 ;; Message ID=517
        )
      (:type :pubcomp
-      :mid 517))
+      :mid 517)
+     2)
 
     (:subscribe
      #(#x82 ;; Fixed header, message type=0x08 (SUBSCRIBE), DUP=0, QoS=1, Retain=0
@@ -186,7 +240,8 @@
       :retain nil
       :mid 1
       :topic "#"
-      :subscription-qos 0))
+      :subscription-qos 0)
+     2)
 
     (:suback
      #(#x90 ;; Fixed header, message type=0x09 (SUBACK), DUP=0, QoS=0, Retain=0
@@ -199,7 +254,8 @@
       :qos 0
       :retain nil
       :mid 1
-      :subscription-qos 0))
+      :subscription-qos 0)
+     2)
 
     (:unsubscribe
      #(#xa2 ;; Fixed header, message type=0x0a (UNSUBSCRIBE), DUP=0, QoS=1, Retain=0
@@ -214,7 +270,8 @@
       :retain nil
       :mid 1
       :topic "#"
-      :subscription-qos 0))
+      :subscription-qos 0)
+     2)
 
     (:unsuback
      #(#xb0 ;; Fixed header, message type=0x0b (UNSUBACK), DUP=0, QoS=0, Retain=0
@@ -225,52 +282,57 @@
       :dup 0
       :qos 0
       :retain nil
-      :mid 1))
+      :mid 1)
+     2)
 
     (:pingreq
      #(#xc0 ;; Fixed header, message type=0x0c (PINGREQ)
        #x00 ;; Remaining length=0
        )
-     (:type :pingreq))
+     (:type :pingreq)
+     2)
 
     (:pingresp
      #(#xd0 ;; Fixed header, message type=0x0d (PINGRESP)
        #x00 ;; Remaining length=0
        )
-     (:type :pingresp))
+     (:type :pingresp)
+     2)
 
     (:disconnect
      #(#xe0 ;; Fixed header, message type=0x0e (DISCONNECT)
        #x00 ;; Remaining length=0
        )
-     (:type :disconnect))))
+     (:type :disconnect)
+     2)))
 
 (defstruct (message-test (:type list))
-  type packet message)
+  type packet message var-header-start)
 
 (deftest test-frame-reader () ()
-  (dolist (packet (mapcar #'message-test-packet *message-tests*))
-    (let ((called-p nil))
-      (flet ((cbk (buf var-header-start)
-               (is-false called-p)
-               (is (equalp buf packet))
-               (is (= 2 var-header-start))
-               (setf called-p t)))
-        (let ((reader (mqtt::make-mqtt-frame-reader #'cbk)))
-          (macrolet ((chk (&body body)
-                       `(progn
-                          (setf called-p nil)
-                          ,@body
-                          (is-true called-p))))
-            (chk
-             (funcall reader packet))
-            (chk
-             (iter (for i from 0 below (length packet))
-                   (funcall reader (subseq packet i (1+ i)))))
-            (iter (for i from 1 below (1- (length packet)))
-                  (chk
-                   (funcall reader (subseq packet 0 i))
-                   (funcall reader (subseq packet i))))))))))
+  (macrolet ((chk (&body body)
+                           `(progn
+                              (setf called-p nil)
+                              ,@body
+                              (is-true called-p))))
+    (iter (for message-test in *message-tests*)
+          (let ((packet (message-test-packet message-test))
+                (called-p nil))
+            (flet ((cbk (buf var-header-start)
+                     (is-false called-p)
+                     (is (equalp buf packet))
+                     (is (= (message-test-var-header-start message-test) var-header-start))
+                     (setf called-p t)))
+              (let ((reader (mqtt::make-mqtt-frame-reader #'cbk)))
+                (chk
+                 (funcall reader packet))
+                (chk
+                 (iter (for i from 0 below (length packet))
+                       (funcall reader (subseq packet i (1+ i)))))
+                (iter (for i from 1 below (1- (length packet)))
+                      (chk
+                       (funcall reader (subseq packet 0 i))
+                       (funcall reader (subseq packet i))))))))))
 
 (deftest test-packet-building () ()
   ;; TBD: test all

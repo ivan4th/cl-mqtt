@@ -30,7 +30,7 @@
                           ((0 1 2 3)
                            (let ((b (aref bytes pos)))
                              (vector-push-extend b buf)
-                             (setf len (+ (ash len 7) (logand b #x7f)))
+                             (setf len (+ (ash (logand b #x7f) (* state 7)) len))
                              (incf pos)
                              (incf var-header-start)
                              (cond ((and (not (logbitp 7 b))

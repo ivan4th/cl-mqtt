@@ -34,6 +34,8 @@
           (sub "/c/d" nil 4)
           (mqtt:disconnect conn))))))
 
+(define-constant +long-str+ (make-string 128 :initial-element #\X) :test #'equal)
+
 (defun verify-publish (qos)
   (with-broker (host port error-cb)
     (let ((messages '()))
@@ -65,9 +67,10 @@
             (bb:all
              (list
               (mqtt:publish conn "/a/b/c" "42" :qos qos :retain nil)
-              (mqtt:publish conn "/a/b/c" "43" :qos qos :retain nil)))
+              (mqtt:publish conn "/a/b/c" +long-str+ :qos qos :retain nil)))
             (bb:wait (wait-for messages)
-              (verify-messages '(("/a/b/c" "42" nil 1) ("/a/b/c" "43" nil 2)))
+              (verify-messages `(("/a/b/c" "42" nil 1)
+                                 ("/a/b/c" ,+long-str+ nil 2)))
               (bb:wait
                   (mqtt:publish conn "/a/b/d" "4242" :qos qos :retain t)
                 ;; expected-retain is still NIL.
