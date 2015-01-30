@@ -33,7 +33,7 @@
              host port
              read-cb
              :event-cb (lambda (error)
-                         (format t "error: ~a~%" error)
+                         (format t "~&error: ~a~%" error)
                          (if connected-p
                              (funcall later-error-cb error)
                              (reject (make-condition
@@ -141,7 +141,9 @@
 (defun %send-message (client message)
   (let ((buf (make-array 1024 :element-type '(unsigned-byte 8) :fill-pointer 0)))
     (build-packet buf message)
-    (as:write-socket-data (socket client) buf)))
+    (as:write-socket-data (socket client)
+                          ;; FIXME (performance)
+                          (coerce buf '(simple-array (unsigned-byte 8) (*))))))
 
 (defun send-message (client message)
   (setf (write-finished-promise client)
