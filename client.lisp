@@ -128,10 +128,12 @@
   (bb:with-promise (resolve reject)
     (let (delay)
       (labels ((handle (message)
-                 (as:free-event delay)
-                 (resolve message)))
+                 (when delay
+                   (as:free-event delay)
+                   (resolve message))))
         (setf delay
               (as:with-delay ((response-timeout client))
+                (setf delay nil)
                 (remove-message-handler client #'handle)
                 (reject
                  (handle-connection-error client "connection timed out"))))
@@ -152,21 +154,23 @@
                    (bb:with-promise (resolve reject :name "SEND-MESSAGE-PROMISE")
                      (setf (write-callback client)
                            #'(lambda ()
-                               (as:free-event delay)
-                               (setf (write-callback client) nil
-                                     (write-finished-promise client) nil)
-                               #++
-                               (dbg "sent ~s: ~s" (mqtt-message-type message) message)
-                               (resolve)))
-                     (%send-message client message)
+                               (when delay
+                                 (as:free-event delay)
+                                 (setf (write-callback client) nil
+                                       (write-finished-promise client) nil)
+                                 #++
+                                 (dbg "sent ~s: ~s" (mqtt-message-type message) message)
+                                 (resolve))))
                      (setf delay
                            (as:with-delay ((response-timeout client)) ;; FIXME: add write-timeout
-                             (setf (write-callback client) nil
+                             (setf delay nil
+                                   (write-callback client) nil
                                    (write-finished-promise client) nil)
                              (%disconnect client)
                              (let ((condition (make-condition 'mqtt-error
                                                               :format-control "Timed out writing")))
-                               (reject condition))))))))
+                               (reject condition))))
+                     (%send-message client message)))))
           (if (null (write-finished-promise client))
               (actually-send)
               (bb:attach (write-finished-promise client) #'actually-send)))))
