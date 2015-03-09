@@ -33,7 +33,7 @@
 (defmethod invoke-test-case :around ((fixture interop-fixture) test-case)
   (with-broker (host port error-cb)
     (setf (connect-args fixture)
-          (list host :port port :error-handler error-cb))
+          (list host :port port :error-handler error-cb :client-id "cl-mqtt-test"))
     (reset-messages fixture)
     (bb:alet ((c (connect)))
       (setf (conn fixture) c)
@@ -47,22 +47,26 @@
 (defmethod setup :after ((fixture interop-fixture))
   (reset-messages fixture))
 
-(defun connect (&optional (fixture *fixture*))
+(defun connect (&rest args-override &key (fixture *fixture*) &allow-other-keys)
   (with-fixture (connect-args messages) fixture
-    (apply #'mqtt:connect
-           (append connect-args
-                   (list :on-message
-                         #'(lambda (message)
-                             (dbg "on-message: ~s" message)
-                             (vector-push-extend
-                              (list (mqtt:mqtt-message-topic message)
-                                    (babel:octets-to-string
-                                     (mqtt:mqtt-message-payload message)
-                                     :encoding :utf-8)
-                                    (mqtt:mqtt-message-retain message)
-                                    (mqtt:mqtt-message-qos message)
-                                    (mqtt:mqtt-message-mid message))
-                              messages)))))))
+    (let ((args (copy-list connect-args)))
+      (doplist (k v args-override)
+        (unless (eq :fixture k)
+          (setf (getf (rest args) k) v)))
+      (apply #'mqtt:connect
+             (append args
+                     (list :on-message
+                           #'(lambda (message)
+                               (dbg "on-message: ~s" message)
+                               (vector-push-extend
+                                (list (mqtt:mqtt-message-topic message)
+                                      (babel:octets-to-string
+                                       (mqtt:mqtt-message-payload message)
+                                       :encoding :utf-8)
+                                      (mqtt:mqtt-message-retain message)
+                                      (mqtt:mqtt-message-qos message)
+                                      (mqtt:mqtt-message-mid message))
+                                messages))))))))
 
 (defun got-messages-p (&optional (fixture *fixture*))
   (not (emptyp (messages fixture))))
@@ -150,6 +154,34 @@
 
 (deftest test-ping (conn) (interop-fixture)
   (mqtt:ping conn))
+
+(deftest test-unclean-session (conn) (interop-fixture)
+  (bb:alet ((c1 (connect :client-id "c1" :clean-session nil)))
+    (bb:walk
+      (mqtt:subscribe c1 "/a/b")
+      (mqtt:publish conn "/a/b" "42" :qos 2)
+      (wait-for (got-messages-p))
+      (verify-messages '(("/a/b" "42" nil 2 1)))
+      (mqtt:disconnect c1)
+      (mqtt:publish conn "/a/b" "4242" :qos 1)
+      (bb:alet ((c1 (connect :client-id "c1" :clean-session nil)))
+        (bb:walk
+          (wait-for (got-messages-p))
+          (verify-messages '(("/a/b" "4242" nil 1 2)))
+          (mqtt:disconnect c1)
+          (mqtt:publish conn "/a/b" "4242--" :qos 1)
+          ;; now try clean session
+          (bb:alet ((c1 (connect :client-id "c1")))
+            (bb:walk
+              (mqtt:subscribe c1 "/a/q")
+              (mqtt:publish conn "/a/q" "4242--xx" :qos 1)
+              (wait-for (got-messages-p))
+              ;; NOTE: 4242-- message is skipped!
+              ;; Also, mid numbering is restarted here due to the new session
+              ;; (FIXME: perhaps shouldn't depend on server-originating
+              ;; MID numbers)
+              (verify-messages '(("/a/q" "4242--xx" nil 1 1)))
+              (mqtt:disconnect c1))))))))
 
 ;; TBD: test overlong messages
 ;; TBD: use 'observe'

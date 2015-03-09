@@ -52,7 +52,7 @@
 (defclass mqtt-client ()
   ((socket :accessor socket :initarg :socket)
    (reader :accessor reader :initarg :reader)
-   (next-mid :accessor next-mid :initform 1)
+   (last-mid :accessor last-mid :initform 0)
    (response-timeout :accessor response-timeout :initform *default-response-timeout*
                      :initarg :response-timeout)
    (keepalive :accessor keepalive :initform *default-keepalive*
@@ -70,13 +70,13 @@
                :initform #'(lambda (message)
                              (format *debug-io* "~&incoming mqtt message: ~s~%" message))
                :initarg :on-message)
-   (ping-stopper :accessor ping-stopper)))
+   (ping-stopper :accessor ping-stopper)
+   (client-id :accessor client-id :initarg :client-id)))
 
 (defun get-next-mid (client)
   ;; FIXME: should keep track of 'in-flight' message ids, etc.
-  (prog1
-      (next-mid client)
-    (incf (next-mid client))))
+  (setf (last-mid client)
+        (logand (1+ (last-mid client)) #xffff)))
 
 (defun handle-connection-error (client error &rest args)
   "Handle an async connection error that cannot be expressed as
@@ -184,7 +184,10 @@
     (:then (result) (first result))))
 
 ;; TBD: need to fill in configurable values
-(defun send-connect-message (client)
+;; TBD: should auto-generate client-id if not specified
+(defun send-connect-message (client &key client-id (clean-session t))
+  (setf client-id (or client-id "cl-mqtt"))
+  (check-type client-id string)
   (send-message
    client
    (make-mqtt-message :type :connect
@@ -197,9 +200,9 @@
                       :connect-password-flag 0
                       :connect-will-qos 0
                       :connect-will-flag 0
-                      :connect-clean-session-flag 1
+                      :connect-clean-session-flag (if clean-session 1 0)
                       :connect-keepalive (keepalive client)
-                      :client-id "cl-mqtt")))
+                      :client-id client-id)))
 
 (defun handle-publish (client message)
   (let ((mid (mqtt-message-mid message)))
@@ -224,7 +227,7 @@
   (send-message client (make-mqtt-message :type :pingresp)))
 
 (defun connect (host &rest initargs &key (port 1883) response-timeout error-handler on-message
-                                      keepalive ping-interval)
+                                      keepalive ping-interval client-id (clean-session t))
   (declare (ignore response-timeout error-handler on-message
                    keepalive ping-interval)) ; passed via initargs
   (let (client)
@@ -242,7 +245,7 @@
                           :reader (make-mqtt-frame-reader
                                    #'(lambda (buf var-header-start)
                                        (handle-packet client buf var-header-start)))
-                          (remove-from-plist initargs :port)))
+                          (remove-from-plist initargs :port :clean-session)))
       (setf (ping-stopper client)
             (as:with-interval ((ping-interval client))
               (ping client)))
@@ -266,7 +269,7 @@
             (handle-connection-error "CONNECT rejected with ret code ~s"
                                      (mqtt-message-ret-code message)))))
       (bb:wait
-          (send-connect-message client)
+          (send-connect-message client :client-id client-id :clean-session clean-session)
         ;; note that we don't wait for connack before returning
         ;; (TBD: make it an option)
         client))))
