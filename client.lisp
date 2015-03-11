@@ -205,23 +205,28 @@
                       :client-id client-id)))
 
 (defun handle-publish (client message)
-  (let ((mid (mqtt-message-mid message)))
-    (case (mqtt-message-qos message)
-      (0
-       (funcall (on-message client) message))
-      (1
-       ;; make sure the :puback is written to the socket
-       ;; so disconnect will not kill it
-       (bb:wait (send-message client (make-mqtt-message :type :puback :mid mid))
-         (funcall (on-message client) message)))
-      (2
-       (bb:walk
-         (send-message client (make-mqtt-message :type :pubrec :mid mid))
-         (wait-for-message client (cons :pubrel mid))
-         ;; FIXME: the delay should not be necessary here
-         ;; https://github.com/orthecreedence/blackbird/issues/16
-         (as:with-delay () (funcall (on-message client) message))
-         (send-message client (make-mqtt-message :type :pubcomp :mid mid)))))))
+  (flet ((invoke-on-message ()
+           (bb:catcher
+               (funcall (on-message client) message)
+             (error (c)
+               (warn "on-message failed: ~a" c)))))
+    (let ((mid (mqtt-message-mid message)))
+      (case (mqtt-message-qos message)
+        (0
+         (invoke-on-message))
+        (1
+         ;; make sure the :puback is written to the socket
+         ;; so disconnect will not kill it
+         (bb:wait (send-message client (make-mqtt-message :type :puback :mid mid))
+           (invoke-on-message)))
+        (2
+         (bb:walk
+           (send-message client (make-mqtt-message :type :pubrec :mid mid))
+           (wait-for-message client (cons :pubrel mid))
+           ;; FIXME: the delay should not be necessary here
+           ;; https://github.com/orthecreedence/blackbird/issues/16
+           (as:with-delay () (invoke-on-message))
+           (send-message client (make-mqtt-message :type :pubcomp :mid mid))))))))
 
 (defun handle-ping (client)
   (send-message client (make-mqtt-message :type :pingresp)))
