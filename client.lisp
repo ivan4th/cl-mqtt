@@ -129,6 +129,7 @@
     (let (delay)
       (labels ((handle (message)
                  (when delay
+                   (as:remove-event delay)
                    (as:free-event delay)
                    (resolve message))))
         (setf delay
@@ -155,6 +156,7 @@
                      (setf (write-callback client)
                            #'(lambda ()
                                (when delay
+                                 (as:remove-event delay)
                                  (as:free-event delay)
                                  (setf (write-callback client) nil
                                        (write-finished-promise client) nil)
@@ -169,6 +171,7 @@
                              (%disconnect client)
                              (let ((condition (make-condition 'mqtt-error
                                                               :format-control "Timed out writing")))
+                               (handle-connection-error client condition)
                                (reject condition))))
                      (%send-message client message)))))
           (if (null (write-finished-promise client))
@@ -342,7 +345,8 @@
 
 (defun %disconnect (client)
   (setf (message-handlers client) '())
-  (funcall (ping-stopper client))
+  (when (ping-stopper client)
+    (funcall (shiftf (ping-stopper client) nil)))
   (unless (as:streamish-closed-p (socket client))
     (as:close-socket (socket client)))
   (values))
