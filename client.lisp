@@ -137,7 +137,7 @@
                 (setf delay nil)
                 (remove-message-handler client #'handle)
                 (reject
-                 (handle-connection-error client "connection timed out"))))
+                 (handle-connection-error client "connection timed out (waiting for ~s)" pred))))
         (push-message-handler client pred #'handle)))))
 
 ;; FIXME: use thread-specific buffer
