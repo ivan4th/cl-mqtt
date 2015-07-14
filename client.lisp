@@ -346,7 +346,10 @@
 (defun %disconnect (client)
   (setf (message-handlers client) '())
   (when (ping-stopper client)
-    (funcall (shiftf (ping-stopper client) nil)))
+    (handler-case
+        (funcall (shiftf (ping-stopper client) nil))
+      (error (c)
+        (warn "PING-STOPPER ERROR: ~a" c))))
   (unless (as:streamish-closed-p (socket client))
     (as:close-socket (socket client)))
   (values))
