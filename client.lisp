@@ -20,7 +20,7 @@
 
 (in-package :cl-mqtt)
 
-(defparameter *default-response-timeout* 2) ;; FIXME
+(defparameter *default-response-timeout* 7) ;; FIXME
 (defparameter *default-keepalive* 60)
 (defparameter *default-ping-interval* 15)
 
