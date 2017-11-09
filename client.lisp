@@ -85,9 +85,10 @@
     (setf error (make-condition 'mqtt-error
                                 :format-control error
                                 :format-arguments args)))
-  (%disconnect client)
-  (when (error-handler client)
-    (funcall (error-handler client) error))
+  (unless (as:streamish-closed-p (socket client))
+    (%disconnect client)
+    (when (error-handler client)
+      (funcall (error-handler client) error)))
   error)
 
 (defun push-message-handler (client match callback &key permanent-p)
@@ -153,6 +154,8 @@
         (flet ((actually-send ()
                  (let (delay)
                    (bb:with-promise (resolve reject :name "SEND-MESSAGE-PROMISE")
+                     #++
+                     (dbg-show (write-callback client))
                      (setf (write-callback client)
                            #'(lambda ()
                                (when delay
@@ -167,11 +170,12 @@
                              (setf delay nil
                                    (write-callback client) nil
                                    (write-finished-promise client) nil)
-                             (%disconnect client)
                              (let ((condition (make-condition 'mqtt-error
                                                               :format-control "Timed out writing message: ~s"
                                                               :format-arguments (list message))))
-                               (handle-connection-error client condition)
+                               (unless (as:streamish-closed-p (socket client))
+                                 ;; the error is expected if the socket is closed
+                                 (handle-connection-error client condition))
                                (reject condition))))
                      (%send-message client message)))))
           (if (or (null (write-finished-promise client))
