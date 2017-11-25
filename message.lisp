@@ -28,6 +28,8 @@
                    connect-flags
                    connect-keepalive
                    client-id
+                   user
+                   password
                    mid
                    topic
                    payload
@@ -40,6 +42,8 @@
   (connect-keepalive 0 :type (unsigned-byte 16))
   (ret-code-raw 0 :type (unsigned-byte 8))
   (client-id "" :type string)
+  (user "" :type string)
+  (password "" :type string)
   (mid 0 :type (unsigned-byte 16))
   (topic "" :type string)
   (payload (make-array 0 :element-type '(unsigned-byte 8)) :type (vector (unsigned-byte 8)))
@@ -108,7 +112,9 @@
   (protocol-level :u8)
   (connect-flags :u8)
   (connect-keepalive :u16)
-  (client-id :str))
+  (client-id :str)
+  (user :str)
+  (password :str))
 
 (define-packet :connack
   (:unused :u8)

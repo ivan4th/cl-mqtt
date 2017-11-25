@@ -193,7 +193,7 @@
 
 ;; TBD: need to fill in configurable values
 ;; TBD: should auto-generate client-id if not specified
-(defun send-connect-message (client &key client-id (clean-session t))
+(defun send-connect-message (client &key user password client-id (clean-session t))
   (setf client-id (or client-id "cl-mqtt"))
   (check-type client-id string)
   (send-message
@@ -204,8 +204,10 @@
                       :retain nil
                       :protocol-name "MQTT"
                       :protocol-level 4
-                      :connect-username-flag 0
-                      :connect-password-flag 0
+                      :connect-username-flag (if (and user (> (length user) 0)) 1 0)
+                      :connect-password-flag (if (and password (> (length password) 0)) 1 0)
+                      :user user
+                      :password password
                       :connect-will-qos 0
                       :connect-will-flag 0
                       :connect-clean-session-flag (if clean-session 1 0)
@@ -239,7 +241,9 @@
 (defun handle-ping (client)
   (send-message client (make-mqtt-message :type :pingresp)))
 
-(defun connect (host &rest initargs &key (port 1883) response-timeout error-handler on-message
+(defun connect (host &rest initargs &key (port 1883)
+                                      user password
+                                      response-timeout error-handler on-message
                                       keepalive ping-interval client-id (clean-session t))
   (declare (ignore response-timeout error-handler on-message
                    keepalive ping-interval)) ; passed via initargs
@@ -258,7 +262,7 @@
                           :reader (make-mqtt-frame-reader
                                    #'(lambda (buf var-header-start)
                                        (handle-packet client buf var-header-start)))
-                          (remove-from-plist initargs :port :clean-session)))
+                          (remove-from-plist initargs :port :clean-session :user :password)))
       (setf (ping-stopper client)
             (as:with-interval ((ping-interval client))
               (ping client)))
@@ -282,7 +286,8 @@
             (handle-connection-error "CONNECT rejected with ret code ~s"
                                      (mqtt-message-ret-code message)))))
       (bb:wait
-          (send-connect-message client :client-id client-id :clean-session clean-session)
+          (send-connect-message client :client-id client-id :clean-session clean-session
+                                       :user user :password password)
         ;; note that we don't wait for connack before returning
         ;; (TBD: make it an option)
         client))))
