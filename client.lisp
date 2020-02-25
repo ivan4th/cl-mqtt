@@ -86,9 +86,9 @@
                                 :format-control error
                                 :format-arguments args)))
   (unless (as:streamish-closed-p (socket client))
-    (%disconnect client)
-    (when (error-handler client)
-      (funcall (error-handler client) error)))
+    (%disconnect client))
+  (when (error-handler client)
+    (funcall (error-handler client) error))
   error)
 
 (defun push-message-handler (client match callback &key permanent-p)
