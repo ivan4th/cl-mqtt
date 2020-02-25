@@ -242,7 +242,7 @@
   (send-message client (make-mqtt-message :type :pingresp)))
 
 (defun connect (host &rest initargs &key (port 1883)
-                                      user password
+                                      (user "") (password "")
                                       response-timeout error-handler on-message
                                       keepalive ping-interval client-id (clean-session t))
   (declare (ignore response-timeout error-handler on-message
