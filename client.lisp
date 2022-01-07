@@ -193,7 +193,8 @@
 
 ;; TBD: need to fill in configurable values
 ;; TBD: should auto-generate client-id if not specified
-(defun send-connect-message (client &key user password client-id (clean-session t))
+(defun send-connect-message (client &key username password client-id (clean-session t)
+                                      will-topic will-message will-qos (will-retain t))
   (setf client-id (or client-id "cl-mqtt"))
   (check-type client-id string)
   (send-message
@@ -204,12 +205,22 @@
                       :retain nil
                       :protocol-name "MQTT"
                       :protocol-level 4
-                      :connect-username-flag (if (and user (> (length user) 0)) 1 0)
+                      :connect-username-flag (if (and username (> (length username) 0)) 1 0)
                       :connect-password-flag (if (and password (> (length password) 0)) 1 0)
-                      :user user
+                      :connect-will-retain (if (and will-topic (> (length will-topic) 0)
+                                                    will-retain)
+                                               1
+                                               0)
+                      :connect-will-flag (if (dbg-show* (and will-topic (> (length will-topic) 0)))
+                                             1
+                                             0)
+                      :connect-will-qos (if (and will-topic (> (length will-topic) 0))
+                                            will-qos
+                                            0)
+                      :username username
                       :password password
-                      :connect-will-qos 0
-                      :connect-will-flag 0
+                      :will-topic will-topic
+                      :will-message will-message
                       :connect-clean-session-flag (if clean-session 1 0)
                       :connect-keepalive (keepalive client)
                       :client-id client-id)))
@@ -243,6 +254,9 @@
 
 (defun connect (host &rest initargs &key (port 1883)
                                       (user "") (password "")
+                                      (will-topic "")
+                                      (will-message "")
+                                      (will-qos 0)
                                       response-timeout error-handler on-message
                                       keepalive ping-interval client-id (clean-session t))
   (declare (ignore response-timeout error-handler on-message
@@ -262,7 +276,9 @@
                           :reader (make-mqtt-frame-reader
                                    #'(lambda (buf var-header-start)
                                        (handle-packet client buf var-header-start)))
-                          (remove-from-plist initargs :port :clean-session :user :password)))
+                          (remove-from-plist initargs
+                                             :port :clean-session :user :password
+                                             :will-topic :will-message :will-qos)))
       (setf (ping-stopper client)
             (as:with-interval ((ping-interval client))
               (ping client)))
@@ -286,8 +302,13 @@
             (handle-connection-error "CONNECT rejected with ret code ~s"
                                      (mqtt-message-ret-code message)))))
       (bb:wait
-          (send-connect-message client :client-id client-id :clean-session clean-session
-                                       :user user :password password)
+          (send-connect-message client :client-id client-id
+                                       :clean-session clean-session
+                                       :username user
+                                       :password password
+                                       :will-topic will-topic
+                                       :will-message will-message
+                                       :will-qos will-qos)
         ;; note that we don't wait for connack before returning
         ;; (TBD: make it an option)
         client))))

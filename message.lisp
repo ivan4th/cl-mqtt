@@ -28,10 +28,12 @@
                    connect-flags
                    connect-keepalive
                    client-id
-                   user
-                   password
                    mid
                    topic
+                   will-topic
+		   will-message
+		   username
+		   password
                    payload
                    subscription-qos-raw
                  &allow-other-keys)))
@@ -42,10 +44,12 @@
   (connect-keepalive 0 :type (unsigned-byte 16))
   (ret-code-raw 0 :type (unsigned-byte 8))
   (client-id "" :type string)
-  (user "" :type string)
-  (password "" :type string)
   (mid 0 :type (unsigned-byte 16))
   (topic "" :type string)
+  (will-topic "" :type string)
+  (will-message "" :type string)
+  (username "" :type string)
+  (password "" :type string)
   (payload (make-array 0 :element-type '(unsigned-byte 8)) :type (vector (unsigned-byte 8)))
   (subscription-qos-raw 0 :type (unsigned-byte 8)))
 
@@ -113,8 +117,10 @@
   (connect-flags :u8)
   (connect-keepalive :u16)
   (client-id :str)
-  (user :str)
-  (password :str))
+  (will-topic :str connect-will-flag)
+  (will-message :str connect-will-flag)
+  (username :str connect-username-flag)
+  (password :str connect-password-flag))
 
 (define-packet :connack
   (:unused :u8)
