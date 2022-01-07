@@ -173,6 +173,8 @@
                              (let ((condition (make-condition 'mqtt-error
                                                               :format-control "Timed out writing message: ~s"
                                                               :format-arguments (list message))))
+                               (handle-connection-error client condition)
+                               #++
                                (unless (as:streamish-closed-p (socket client))
                                  ;; the error is expected if the socket is closed
                                  (handle-connection-error client condition))
